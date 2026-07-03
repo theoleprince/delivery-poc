@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:poc_uber/config/theme/app_colors.dart';
 import 'package:poc_uber/config/theme/spacing.dart';
 import 'package:poc_uber/core/constants/app_routes.dart';
 import 'package:poc_uber/features/auth/presentation/providers/auth_providers.dart';
@@ -8,6 +11,10 @@ import 'package:poc_uber/features/delivery/domain/entities/delivery_entity.dart'
 import 'package:poc_uber/features/delivery/domain/services/delivery_pricing.dart';
 import 'package:poc_uber/features/delivery/presentation/providers/delivery_draft_provider.dart';
 import 'package:poc_uber/features/delivery/presentation/providers/delivery_providers.dart';
+import 'package:poc_uber/features/wallet/domain/entities/transaction_entity.dart';
+import 'package:poc_uber/features/wallet/domain/entities/wallet_entity.dart';
+import 'package:poc_uber/features/wallet/domain/usecases/create_transaction_usecase.dart';
+import 'package:poc_uber/features/wallet/presentation/providers/wallet_providers.dart';
 import 'package:poc_uber/shared/widgets/card_widget.dart';
 import 'package:poc_uber/shared/widgets/primary_button.dart';
 
@@ -35,6 +42,19 @@ class DeliverySummaryPage extends ConsumerWidget {
       deliveryType: draft.deliveryType,
     );
 
+    final String? senderId = ref.watch(authStateProvider).valueOrNull?.uid;
+    final bool paysBeforeDelivery =
+        draft.paymentMethod == PaymentMethod.beforeDelivery;
+    final AsyncValue<WalletEntity?> walletState =
+        senderId == null || !paysBeforeDelivery
+        ? const AsyncValue<WalletEntity?>.data(null)
+        : ref.watch(walletProvider(senderId));
+    final double? availableBalance = walletState.valueOrNull?.balance;
+    final bool hasInsufficientBalance =
+        paysBeforeDelivery &&
+        availableBalance != null &&
+        availableBalance < estimate.price;
+
     ref.listen<AsyncValue<DeliveryEntity?>>(createDeliveryControllerProvider, (
       AsyncValue<DeliveryEntity?>? previous,
       AsyncValue<DeliveryEntity?> next,
@@ -46,10 +66,32 @@ class DeliverySummaryPage extends ConsumerWidget {
         return;
       }
       final DeliveryEntity? created = next.valueOrNull;
-      if (created != null) {
-        draftController.reset();
-        context.go(AppRoutes.home);
+      if (created == null) return;
+
+      // Débite le wallet séparément de la création de la livraison (voir
+      // ARCHITECTURE.md §10.3) : la vérification de solde avant confirmation
+      // rend ce débit quasi certain de réussir, mais un échec ici (rare)
+      // laisse la livraison créée sans compensation automatique — limitation
+      // assumée pour ce POC (pas de saga/transaction distribuée).
+      if (created.paymentMethod == PaymentMethod.beforeDelivery) {
+        unawaited(
+          ref
+              .read(createTransactionUseCaseProvider)
+              .call(
+                CreateTransactionParams(
+                  uid: created.senderId,
+                  type: TransactionType.debit,
+                  amount: created.estimatedPrice,
+                  description:
+                      'Livraison vers ${created.destination.formattedAddress}',
+                  relatedDeliveryId: created.id,
+                ),
+              ),
+        );
       }
+
+      draftController.reset();
+      context.go(AppRoutes.home);
     });
 
     final AsyncValue<DeliveryEntity?> createState = ref.watch(
@@ -57,8 +99,18 @@ class DeliverySummaryPage extends ConsumerWidget {
     );
 
     void confirm() {
-      final String? senderId = ref.read(authStateProvider).valueOrNull?.uid;
       if (senderId == null) return;
+
+      if (hasInsufficientBalance) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Solde insuffisant pour payer avant livraison. Choisis "À la livraison" ou recharge ton wallet.',
+            ),
+          ),
+        );
+        return;
+      }
 
       final DeliveryEntity delivery = draft.toEntity(
         senderId: senderId,
@@ -149,6 +201,17 @@ class DeliverySummaryPage extends ConsumerWidget {
                   draftController.setPaymentMethod(selection.first),
             ),
           ),
+          if (paysBeforeDelivery) ...<Widget>[
+            const SizedBox(height: Spacing.sm),
+            Text(
+              availableBalance == null
+                  ? 'Chargement du solde...'
+                  : 'Solde disponible : ${availableBalance.toStringAsFixed(2)} €',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: hasInsufficientBalance ? AppColors.error : null,
+              ),
+            ),
+          ],
           const SizedBox(height: Spacing.md),
           CardWidget(
             title: 'Estimation',
@@ -164,7 +227,7 @@ class DeliverySummaryPage extends ConsumerWidget {
           PrimaryButton(
             label: 'Confirmer la livraison',
             isLoading: createState.isLoading,
-            onPressed: confirm,
+            onPressed: hasInsufficientBalance ? null : confirm,
           ),
         ],
       ),

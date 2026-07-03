@@ -208,3 +208,30 @@ Ajout d'un paramètre `onTap` optionnel à `CardWidget` (`InkWell` + `Card.clipB
 ### 9.6 Timeline minimale, cycle de vie du statut reporté
 
 `DeliveryDetailPage` n'affiche qu'un seul événement ("Créée le ...") : `DeliveryStatus` reste figé à `pending` (voir §8, `DeliveryEntity`). Une vraie timeline (`pickedUp`, `inTransit`, `delivered`...) n'a de sens qu'avec `tracking`, qui mettra à jour le document Firestore en continu — `watchDeliveryById` (§9.1) est déjà prêt à réagir à ces changements sans modification.
+
+---
+
+## 10. Sprint 4 — Feature `wallet`
+
+### 10.1 Provisioning automatique réactif, pas couplé à `auth`
+
+`CLAUDE.md` demande de "créer automatiquement un wallet utilisateur". Plutôt que de faire appeler `CreateWalletUseCase` par `AuthRepositoryImpl.signUp` (ce qui coupleraient les couches `data` de deux features — `auth` devrait connaître le schéma Firestore de `wallet`), le provisioning est déclenché **côté presentation**, à la racine de l'app (`PocUberApp.build()`, `main.dart`) : un `ref.listen(authStateProvider, ...)` appelle `EnsureWalletExistsUseCase` dès qu'un `uid` non nul apparaît. `ensureWalletExists` est **idempotent** (vérifie l'existence dans une transaction Firestore avant de créer) : sans risque à rappeler à chaque connexion, donc pas besoin de distinguer "inscription" de "connexion". `auth` n'importe jamais rien de `wallet` — c'est `wallet` qui dépend du contrat public de `auth` (`authStateProvider`), même direction de dépendance que `delivery` → `map`.
+
+Chaque wallet créé reçoit un **bonus de bienvenue simulé** (50 €, `WalletRemoteDataSourceImpl._welcomeBonusAmount`) sous forme d'une transaction de crédit — sans ça, l'historique de transactions resterait vide indéfiniment pour une démo, ce qui n'aide pas à convaincre un client (`CLAUDE.md` § OBJECTIF FINAL).
+
+### 10.2 Solde et transaction toujours écrits ensemble (`Firestore.runTransaction`)
+
+`WalletRemoteDataSourceImpl.createTransaction`/`ensureWalletExists` utilisent `runTransaction` : lecture du solde courant, calcul du nouveau solde, écriture du solde ET de la transaction dans le même batch atomique. Sans ça, une lecture-puis-écriture non protégée pourrait perdre un débit concurrent (deux confirmations de livraison presque simultanées) ou laisser un wallet créé sans sa transaction de bienvenue. `createTransaction` lève `InsufficientBalanceException` (interne au datasource) si un débit dépasse le solde — convertie en `Failure.server` par `WalletRepositoryImpl`, même convention que les autres échecs métier non-auth/réseau (voir `LocationRepositoryImpl`, §8.4).
+
+### 10.3 Intégration avec `delivery` : paiement "avant livraison" débite réellement le wallet
+
+Décision produit assumée (documentée ici plutôt que validée séparément, par cohérence avec les précédentes simplifications) : sans lien entre `delivery` et `wallet`, le wallet resterait un module de démonstration isolé sans transactions réelles autres que le bonus de bienvenue. `DeliverySummaryPage` :
+- Affiche le solde disponible dès que "Paiement avant livraison" est sélectionné (`ref.watch(walletProvider(senderId))`).
+- Bloque la confirmation (bouton désactivé + message) si le solde est insuffisant — vérifié **avant** la création de la livraison.
+- Une fois la livraison créée avec succès, déclenche `CreateTransactionUseCase` (débit, `relatedDeliveryId` renseigné) de façon asynchrone et non bloquante (`unawaited`).
+
+**Limitation assumée** : la vérification de solde avant confirmation rend l'échec du débit après création quasi improbable, mais pas impossible (ex. coupure réseau entre les deux appels). Il n'y a pas de saga / transaction distribuée entre les collections `deliveries` et `wallets`/`transactions` (ça nécessiterait une Cloud Function déclenchée sur écriture Firestore, hors scope d'un POC sans backend serveur). "Paiement à la livraison" ne touche jamais le wallet — l'argent change de main physiquement/via `tracking` (futur), pas via ce module.
+
+### 10.4 Widgets partagés `WalletCard`/`TransactionCard`
+
+Même règle que `DeliveryCard`/`MapWidget` (§3, §8.1, §9.3) : paramètres déjà formatés (`balanceLabel`, `amountLabel`, ...), pas d'entité `wallet` passée directement à `shared/`.

@@ -2,7 +2,7 @@
 
 ## Statut
 
-Implémentées : `users` (feature `auth`), `deliveries` (feature `delivery`, flux de création). Les autres collections sont **planifiées** : leur schéma sera écrit au moment de l'implémentation de la feature correspondante, pour éviter de documenter une structure qui n'a pas encore été validée par du code réel.
+Implémentées : `users` (feature `auth`), `deliveries` (feature `delivery`), `wallets`/`transactions` (feature `wallet`). Les autres collections sont **planifiées** : leur schéma sera écrit au moment de l'implémentation de la feature correspondante, pour éviter de documenter une structure qui n'a pas encore été validée par du code réel.
 
 ---
 
@@ -58,12 +58,47 @@ Sans cet index, la requête échoue au runtime avec `failed-precondition` — Fi
 
 ---
 
+## `wallets/{uid}`
+
+Créé par `WalletRemoteDataSource.ensureWalletExists` (feature `wallet`) à la première connexion de l'utilisateur (voir `ARCHITECTURE.md` §10.1). `{uid}` = `FirebaseAuth` UID (même identifiant que `users/{uid}`).
+
+| Champ       | Type      | Description |
+|-------------|-----------|-------------|
+| `uid`       | string    | Identifiant Firebase Auth (dupliqué en champ pour les requêtes) |
+| `balance`   | number    | Solde courant, modifié uniquement via `runTransaction` (§10.2) |
+| `createdAt` | timestamp | Date de création |
+| `updatedAt` | timestamp | Dernière mise à jour (à chaque transaction) |
+
+## `transactions/{id}`
+
+Créé par `WalletRemoteDataSource.createTransaction` (débit/crédit) ou `ensureWalletExists` (bonus de bienvenue). `{id}` = ID auto-généré Firestore.
+
+| Champ                | Type      | Description |
+|-----------------------|-----------|-------------|
+| `uid`                  | string    | UID du propriétaire du wallet |
+| `type`                 | string    | `credit` \| `debit` |
+| `amount`               | number    | Montant (toujours positif ; le signe est déduit de `type`) |
+| `description`          | string    | Libellé affiché (ex. "Bonus de bienvenue", "Livraison vers ...") |
+| `relatedDeliveryId`    | string?   | ID du document `deliveries` associé, si le débit provient d'un paiement de livraison (voir §10.3) |
+| `createdAt`            | timestamp | Date de la transaction |
+
+Notes :
+- `wallets` et `transactions` sont deux collections top-level distinctes (pas de sous-collection), conformément à `CLAUDE.md` (`# FIRESTORE`).
+- Solde et transaction sont toujours écrits ensemble dans une `runTransaction` Firestore — jamais l'un sans l'autre (§10.2).
+- Règles de sécurité Firestore : toujours à définir lors de la configuration réelle du projet.
+
+**Index composite requis** (même besoin que `deliveries`, §ci-dessus) : l'historique des transactions filtre sur `uid` et trie sur `createdAt`.
+
+| Collection      | Champs indexés |
+|-----------------|----------------|
+| `transactions`  | `uid` (Ascending), `createdAt` (Descending) |
+
+---
+
 ## Collections planifiées (non implémentées)
 
 | Collection      | Feature propriétaire | Statut |
 |-----------------|----------------------|--------|
-| `wallets`       | `wallet`              | planifié |
-| `transactions`  | `wallet`               | planifié |
 | `settings`      | `settings`             | planifié |
 | `notifications` | `notifications`        | planifié |
 

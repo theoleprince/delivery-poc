@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,6 +9,9 @@ import 'package:poc_uber/config/firebase/firebase_options.dart';
 import 'package:poc_uber/config/mapbox/mapbox_config.dart';
 import 'package:poc_uber/config/router/app_router.dart';
 import 'package:poc_uber/config/theme/app_theme.dart';
+import 'package:poc_uber/features/auth/domain/entities/user_entity.dart';
+import 'package:poc_uber/features/auth/presentation/providers/auth_providers.dart';
+import 'package:poc_uber/features/wallet/presentation/providers/wallet_providers.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -21,6 +26,19 @@ class PocUberApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final GoRouter router = ref.watch(appRouterProvider);
+
+    // Provisionne le wallet de l'utilisateur à chaque connexion — voir
+    // ARCHITECTURE.md §10.1. Idempotent (`ensureWalletExists`), donc sûr à
+    // appeler à chaque changement d'état d'authentification.
+    ref.listen<AsyncValue<UserEntity?>>(authStateProvider, (
+      AsyncValue<UserEntity?>? previous,
+      AsyncValue<UserEntity?> next,
+    ) {
+      final String? uid = next.valueOrNull?.uid;
+      if (uid != null) {
+        unawaited(ref.read(ensureWalletExistsUseCaseProvider).call(uid));
+      }
+    });
 
     return MaterialApp.router(
       title: 'POC Uber',

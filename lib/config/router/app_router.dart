@@ -19,6 +19,8 @@ import 'package:poc_uber/features/delivery/presentation/pages/delivery_route_pag
 import 'package:poc_uber/features/delivery/presentation/pages/delivery_summary_page.dart';
 import 'package:poc_uber/features/delivery/presentation/pages/package_info_page.dart';
 import 'package:poc_uber/features/delivery/presentation/pages/recipient_info_page.dart';
+import 'package:poc_uber/features/wallet/presentation/pages/transaction_detail_page.dart';
+import 'package:poc_uber/features/wallet/presentation/pages/wallet_page.dart';
 import 'package:poc_uber/shared/widgets/primary_button.dart';
 
 part 'app_router.g.dart';
@@ -115,6 +117,16 @@ GoRouter appRouter(Ref ref) {
         builder: (BuildContext context, GoRouterState state) =>
             DeliveryDetailPage(deliveryId: state.pathParameters['id']!),
       ),
+      GoRoute(
+        path: AppRoutes.wallet,
+        builder: (BuildContext context, GoRouterState state) =>
+            const WalletPage(),
+      ),
+      GoRoute(
+        path: AppRoutes.transactionDetailPattern,
+        builder: (BuildContext context, GoRouterState state) =>
+            TransactionDetailPage(transactionId: state.pathParameters['id']!),
+      ),
     ],
   );
 }
@@ -173,6 +185,11 @@ class _HomePlaceholderPage extends ConsumerWidget {
               PrimaryButton(
                 label: 'Historique des livraisons',
                 onPressed: () => context.push(AppRoutes.deliveryHistory),
+              ),
+              const SizedBox(height: Spacing.sm),
+              PrimaryButton(
+                label: 'Mon wallet',
+                onPressed: () => context.push(AppRoutes.wallet),
               ),
               const SizedBox(height: Spacing.sm),
               PrimaryButton(

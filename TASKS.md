@@ -49,13 +49,23 @@ Légende : `[x]` fait · `[ ]` à faire · `[~]` partiellement fait (voir note)
 
 ---
 
-## Backlog — Features non démarrées
+## Sprint 4 — Feature `wallet`
 
-### `wallet` (Portefeuille)
-- [ ] Analyse + Architecture
-- [ ] Création automatique du wallet utilisateur (déclenchée à l'inscription — à coordonner avec `auth`)
-- [ ] Solde, liste transactions, détail transaction (simulation via Firestore)
-- [ ] Widgets : `WalletCard`, `TransactionCard`
+- [x] Domain : `WalletEntity`, `TransactionEntity` (+ enum `TransactionType`), `WalletRepository`, usecases (`EnsureWalletExistsUseCase`, `WatchWalletUseCase`, `WatchTransactionsUseCase`, `WatchTransactionByIdUseCase`, `CreateTransactionUseCase`)
+- [x] Data : `WalletModel`/`TransactionModel`, `WalletRemoteDataSource` (Firestore `wallets`/`transactions`, écritures atomiques via `runTransaction`), `WalletRepositoryImpl`
+- [x] Presentation : `WalletPage` (solde + historique), `TransactionDetailPage` (+ lien vers la livraison associée)
+- [x] Provisioning automatique réactif à la connexion (`main.dart`), idempotent, bonus de bienvenue simulé (50 €)
+- [x] Widgets partagés : `WalletCard`, `TransactionCard`
+- [x] Routing : `/wallet`, `/wallet/transactions/:id`, lien "Mon wallet" depuis la home
+- [x] **Intégration `delivery` ↔ `wallet`** : paiement "avant livraison" vérifie le solde puis débite le wallet à la confirmation (voir `ARCHITECTURE.md` §10.3)
+- [x] Tests unitaires (usecase, repository — dont solde insuffisant) + tests widgets (`WalletCard`, `TransactionCard`)
+- [x] Docs mises à jour : `ARCHITECTURE.md` §10, `FIRESTORE_SCHEMA.md` (`wallets`/`transactions` + index composite), `API_DOCUMENTATION.md`
+- [ ] Exécution réelle (côté utilisateur) : `flutter analyze`, `flutter test`
+- [ ] Créer l'index composite Firestore (`uid` + `createdAt` sur `transactions`) une fois un vrai projet connecté
+
+---
+
+## Backlog — Features non démarrées
 
 ### `tracking` (Suivi temps réel)
 - [ ] Analyse + Architecture (réutilisera `MapWidget`/`LocationRepository` de la feature `map`)
@@ -76,11 +86,12 @@ Légende : `[x]` fait · `[ ]` à faire · `[~]` partiellement fait (voir note)
 - [ ] Intégration Firebase Cloud Messaging, collection `notifications`
 
 ### Widgets partagés restants (à construire avec leur feature consommatrice)
-- [ ] `WalletCard`, `TransactionCard`, `BottomNavigation`, `Toolbar`
+- [ ] `BottomNavigation`, `Toolbar`
 
 ### Limitations connues à lever plus tard
 - [ ] `GetRouteUseCase` (feature `map`) : remplacer la polyline en ligne droite par un vrai calcul d'itinéraire (Directions API) — voir `ARCHITECTURE.md` §8.3
 - [ ] `DeliveryPricing` : remplacer le calcul simplifié par un vrai moteur de tarification (zones, surcharge horaire) — voir `ARCHITECTURE.md` §8.8
+- [ ] Débit wallet après création de livraison : pas de saga/transaction distribuée entre `deliveries` et `wallets`/`transactions` (nécessiterait une Cloud Function) — voir `ARCHITECTURE.md` §10.3
 
 ---
 

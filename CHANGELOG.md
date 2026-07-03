@@ -4,6 +4,16 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
 ## [Unreleased]
 
+### Added — Feature `wallet`
+- Domaine : `WalletEntity`, `TransactionEntity` (+ `TransactionType`), `WalletRepository`, usecases (`EnsureWalletExistsUseCase`, `WatchWalletUseCase`, `WatchTransactionsUseCase`, `WatchTransactionByIdUseCase`, `CreateTransactionUseCase`).
+- Data : `WalletModel`/`TransactionModel`, `WalletRemoteDataSource` (Firestore `wallets`/`transactions`, écritures atomiques via `runTransaction`), `WalletRepositoryImpl`.
+- Presentation : `WalletPage`, `TransactionDetailPage`, provisioning automatique du wallet à la connexion (`main.dart`, bonus de bienvenue simulé de 50 €).
+- Widgets partagés : `WalletCard`, `TransactionCard`.
+- Routes `/wallet`, `/wallet/transactions/:id`, lien "Mon wallet" sur la home.
+- **`DeliverySummaryPage`** vérifie le solde et débite le wallet quand le paiement est choisi "avant livraison" (voir `ARCHITECTURE.md` §10.3).
+- Tests unitaires (usecase, repository — dont solde insuffisant) et tests widgets (`WalletCard`, `TransactionCard`).
+- Note : nécessite un index composite Firestore (`uid` + `createdAt` sur `transactions`) — voir `FIRESTORE_SCHEMA.md`.
+
 ### Added — Feature `delivery` : Historique + Détail
 - Domaine : `DeliveryRepository.watchUserDeliveries`/`watchDeliveryById` (flux), `WatchUserDeliveriesUseCase`, `WatchDeliveryByIdUseCase`.
 - Data : requêtes Firestore `.snapshots()` sur `deliveries` (liste par expéditeur triée par date, document unique).

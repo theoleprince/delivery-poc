@@ -116,8 +116,58 @@ Implémentation : `LocationRepositoryImpl`, qui délègue à `LocationRemoteData
 
 `DeliveryCard` (`lib/shared/widgets/delivery_card.dart`) et `EmptyState` (`lib/shared/widgets/empty_state.dart`) — voir `ARCHITECTURE.md` §9.3. `CardWidget` étend son API avec un `onTap` optionnel (§9.4).
 
+### Intégration paiement ↔ `wallet`
+
+Depuis le sprint 4, `DeliverySummaryPage` débite le wallet de l'expéditeur quand `paymentMethod == beforeDelivery` — voir `ARCHITECTURE.md` §10.3 et la section `wallet` ci-dessous.
+
+---
+
+## Feature `wallet`
+
+### `WalletRepository` (interface — `lib/features/wallet/domain/repositories/wallet_repository.dart`)
+
+| Membre | Signature | Description |
+|---|---|---|
+| `ensureWalletExists` | `Future<Result<void>> ensureWalletExists(String uid)` | Idempotent — crée le wallet + bonus de bienvenue s'il n'existe pas encore. Voir `ARCHITECTURE.md` §10.1. |
+| `watchWallet` | `Stream<WalletEntity?> watchWallet(String uid)` | Solde en flux. |
+| `watchTransactions` | `Stream<List<TransactionEntity>> watchTransactions(String uid)` | Historique en flux, le plus récent en premier (index composite requis, voir `FIRESTORE_SCHEMA.md`). |
+| `watchTransactionById` | `Stream<TransactionEntity?> watchTransactionById(String id)` | Détail d'une transaction en flux. |
+| `createTransaction` | `Future<Result<TransactionEntity>> createTransaction({required String uid, required TransactionType type, required double amount, required String description, String? relatedDeliveryId})` | Débite/crédite le wallet et crée la transaction de façon atomique (`runTransaction`, §10.2). Échoue avec `Failure.server` si un débit dépasse le solde. |
+
+Implémentation : `WalletRepositoryImpl`, qui délègue à `WalletRemoteDataSource` (Firestore `wallets`/`transactions`).
+
+### Usecases (`lib/features/wallet/domain/usecases/`)
+
+| Usecase | Params | Retour |
+|---|---|---|
+| `EnsureWalletExistsUseCase` | `String uid` | `Result<void>` |
+| `WatchWalletUseCase` | `String uid` | `Stream<WalletEntity?>` |
+| `WatchTransactionsUseCase` | `String uid` | `Stream<List<TransactionEntity>>` |
+| `WatchTransactionByIdUseCase` | `String id` | `Stream<TransactionEntity?>` |
+| `CreateTransactionUseCase` | `CreateTransactionParams({uid, type, amount, description, relatedDeliveryId})` | `Result<TransactionEntity>` |
+
+### Providers Riverpod (`lib/features/wallet/presentation/providers/wallet_providers.dart`)
+
+| Provider | Type | Rôle |
+|---|---|---|
+| `walletProvider(uid)` | `StreamProvider.family<WalletEntity?, String>` | Consommé par `WalletPage` et `DeliverySummaryPage` (vérification de solde). |
+| `walletTransactionsProvider(uid)` | `StreamProvider.family<List<TransactionEntity>, String>` | Consommé par `WalletPage`. |
+| `transactionByIdProvider(id)` | `StreamProvider.family<TransactionEntity?, String>` | Consommé par `TransactionDetailPage`. |
+
+### Provisioning
+
+Déclenché depuis `PocUberApp` (`main.dart`), pas depuis `auth` — voir `ARCHITECTURE.md` §10.1.
+
+### Pages
+
+`WalletPage` (`/wallet`, solde + liste de transactions) → `TransactionDetailPage` (`/wallet/transactions/:id`, avec lien vers la livraison associée si `relatedDeliveryId` est renseigné).
+
+### Widgets partagés ajoutés
+
+`WalletCard`, `TransactionCard` (`lib/shared/widgets/`) — voir `ARCHITECTURE.md` §10.4.
+
 ---
 
 ## Features suivantes
 
-Non implémentées — voir `TASKS.md` : `wallet`, `tracking`, `settings`, `profile`, `notifications`. Chaque feature ajoutera sa section ici au moment de son implémentation.
+Non implémentées — voir `TASKS.md` : `tracking`, `settings`, `profile`, `notifications`. Chaque feature ajoutera sa section ici au moment de son implémentation.

@@ -132,4 +132,56 @@ void main() {
 
     expect(repository.watchDeliveryById('missing'), emits(null));
   });
+
+  group('updateTrackingState', () {
+    const CoordinatesEntity position = CoordinatesEntity(
+      latitude: 46,
+      longitude: 3,
+    );
+
+    test('délègue au datasource avec les coordonnées à plat', () async {
+      when(
+        () => dataSource.updateTrackingState(
+          id: 'delivery-1',
+          status: DeliveryStatus.inTransit,
+          courierLatitude: 46,
+          courierLongitude: 3,
+        ),
+      ).thenAnswer((_) async {});
+
+      final Result<void> result = await repository.updateTrackingState(
+        id: 'delivery-1',
+        status: DeliveryStatus.inTransit,
+        courierPosition: position,
+      );
+
+      expect(result, const Result<void>.success(null));
+    });
+
+    test('mappe FirebaseException en Failure.server', () async {
+      when(
+        () => dataSource.updateTrackingState(
+          id: any(named: 'id'),
+          status: any(named: 'status'),
+          courierLatitude: any(named: 'courierLatitude'),
+          courierLongitude: any(named: 'courierLongitude'),
+        ),
+      ).thenThrow(FirebaseException(plugin: 'firestore', message: 'boom'));
+
+      final Result<void> result = await repository.updateTrackingState(
+        id: 'delivery-1',
+        status: DeliveryStatus.inTransit,
+        courierPosition: position,
+      );
+
+      expect(
+        result,
+        isA<ResultFailure<void>>().having(
+          (ResultFailure<void> r) => r.failure,
+          'failure',
+          isA<ServerFailure>(),
+        ),
+      );
+    });
+  });
 }

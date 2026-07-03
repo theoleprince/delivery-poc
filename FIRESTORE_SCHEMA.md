@@ -40,12 +40,15 @@ Créé par `DeliveryRemoteDataSource.createDelivery` (feature `delivery`) à la 
 | `estimatedDurationMinutes`   | number    | Durée estimée en minutes |
 | `deliveryType`               | string    | `standard` \| `express` |
 | `paymentMethod`              | string    | `beforeDelivery` \| `onDelivery` (paiement simulé, voir `CLAUDE.md`) |
-| `status`                     | string    | `pending` uniquement ce sprint — cycle de vie complet géré par `tracking` (planifié) |
+| `status`                     | string    | `pending` \| `pickedUp` \| `inTransit` \| `delivered` — piloté par `tracking` (`updateTrackingState`, voir `ARCHITECTURE.md` §11.2) |
+| `courierLatitude`            | number?   | Position simulée du livreur — absent tant que le suivi n'a pas démarré |
+| `courierLongitude`           | number?   | idem |
 | `createdAt`                  | timestamp | Date de création (server timestamp) |
-| `updatedAt`                  | timestamp | Dernière mise à jour |
+| `updatedAt`                  | timestamp | Dernière mise à jour (création, paiement wallet non inclus, mise à jour de suivi) |
 
 Notes :
 - `pickup`/`destination` sont des adresses embarquées (pas une référence à une autre collection) : elles ne changent jamais après création, pas besoin de normalisation.
+- `courierLatitude`/`courierLongitude` sont des champs plats (pas un `map` imbriqué) : réécrits très fréquemment pendant une simulation de suivi (toutes les 2 secondes), pas besoin d'un modèle dédié pour 2 doubles.
 - Règles de sécurité Firestore : toujours à définir lors de la configuration réelle du projet (voir `README.md`).
 
 **Index composite requis** : l'historique (`DeliveryRepository.watchUserDeliveries`) filtre sur `senderId` et trie sur `createdAt` — Firestore exige un index composite pour cette combinaison `where` + `orderBy` sur des champs différents. À créer dans la console Firebase (Firestore → Indexes) une fois le projet réel connecté :

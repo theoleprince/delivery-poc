@@ -4,6 +4,18 @@ Format basé sur [Keep a Changelog](https://keepachangelog.com/fr/1.0.0/).
 
 ## [Unreleased]
 
+### Added — Feature `tracking`
+- `DeliveryStatus` étendu (`pickedUp`, `inTransit`, `delivered`), `DeliveryEntity.courierPosition`, `DeliveryRepository.updateTrackingState` (contrat public consommé par `tracking`).
+- `SimulateDeliveryTrackingUseCase` : simulation de déplacement en 12 étapes, pilotée côté client (app de l'expéditeur), `stepInterval` injectable pour les tests.
+- Presentation : `TrackDeliveryController`, `TrackingPage` (marqueur du livreur animé entre deux positions Firestore).
+- `DeliveryDetailPage` : statut réel affiché, bouton "Suivre en temps réel", marqueur livreur sur la carte.
+- Route `/delivery/history/:id/tracking`.
+- `deliveryStatusLabel` extrait en helper partagé (`lib/features/delivery/presentation/utils/`) pour éviter la duplication entre `DeliveryHistoryPage`, `DeliveryDetailPage` et `TrackingPage`.
+- Tests unitaires (`SimulateDeliveryTrackingUseCase`, `DeliveryRepositoryImpl.updateTrackingState`).
+
+### Fixed — `MapWidget`
+- Le diffing des marqueurs recréait tous les marqueurs à chaque `build()` (comparaison de `List` par référence, toujours différente). Corrigé par un suivi des annotations Mapbox par id de marqueur, avec mise à jour en place (`manager.update`) — nécessaire pour l'animation fluide du marqueur de `tracking`. `LatLng`/`MapMarkerData` ont désormais une égalité de valeur ; `LatLng.lerp` ajouté pour l'interpolation.
+
 ### Added — Feature `wallet`
 - Domaine : `WalletEntity`, `TransactionEntity` (+ `TransactionType`), `WalletRepository`, usecases (`EnsureWalletExistsUseCase`, `WatchWalletUseCase`, `WatchTransactionsUseCase`, `WatchTransactionByIdUseCase`, `CreateTransactionUseCase`).
 - Data : `WalletModel`/`TransactionModel`, `WalletRemoteDataSource` (Firestore `wallets`/`transactions`, écritures atomiques via `runTransaction`), `WalletRepositoryImpl`.

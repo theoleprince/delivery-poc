@@ -5,13 +5,31 @@ import 'package:mapbox_maps_flutter/mapbox_maps_flutter.dart' as mapbox;
 
 /// Position générique (latitude/longitude), indépendante du SDK carte.
 /// `shared/` ne dépend jamais d'une feature (voir ARCHITECTURE.md §3) :
-/// les features (`map`, `delivery`) convertissent leurs propres entités
-/// domain vers ce type au moment d'appeler [MapWidget].
+/// les features (`map`, `delivery`, `tracking`) convertissent leurs propres
+/// entités domain vers ce type au moment d'appeler [MapWidget].
 class LatLng {
   const LatLng({required this.latitude, required this.longitude});
 
   final double latitude;
   final double longitude;
+
+  /// Interpolation linéaire entre deux points — utilisée par `tracking`
+  /// pour animer le marqueur du livreur entre deux positions Firestore
+  /// (voir ARCHITECTURE.md §11.3).
+  static LatLng lerp(LatLng a, LatLng b, double t) => LatLng(
+    latitude: a.latitude + (b.latitude - a.latitude) * t,
+    longitude: a.longitude + (b.longitude - a.longitude) * t,
+  );
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is LatLng &&
+          other.latitude == latitude &&
+          other.longitude == longitude);
+
+  @override
+  int get hashCode => Object.hash(latitude, longitude);
 }
 
 class MapMarkerData {
@@ -19,14 +37,27 @@ class MapMarkerData {
 
   final String id;
   final LatLng position;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is MapMarkerData && other.id == id && other.position == position);
+
+  @override
+  int get hashCode => Object.hash(id, position);
 }
 
-/// Composant carte générique du Design System, consommé par `map` et
-/// `delivery`. Enveloppe le SDK Mapbox (voir `CLAUDE.md` § AMENDEMENTS
-/// 2026-07-03 — remplace Google Maps Flutter pour éviter la facturation
-/// Google Cloud obligatoire sur ce POC) derrière une interface neutre
-/// (`LatLng`/`MapMarkerData`) : un futur changement de fournisseur de
-/// carte resterait cantonné à ce fichier.
+/// Composant carte générique du Design System, consommé par `map`,
+/// `delivery` et `tracking`. Enveloppe le SDK Mapbox (voir `CLAUDE.md` §
+/// AMENDEMENTS 2026-07-03 — remplace Google Maps Flutter pour éviter la
+/// facturation Google Cloud obligatoire sur ce POC) derrière une interface
+/// neutre (`LatLng`/`MapMarkerData`) : un futur changement de fournisseur
+/// de carte resterait cantonné à ce fichier.
+///
+/// Les marqueurs existants sont mis à jour **en place** (`update`) plutôt
+/// que supprimés/recréés à chaque changement — nécessaire pour une
+/// "animation fluide du marqueur" (`tracking`, plusieurs mises à jour par
+/// seconde) sans à-coups ni recréation coûteuse côté SDK natif.
 ///
 /// ATTENTION : l'API des annotations Mapbox (`PointAnnotationManager`,
 /// `PolylineAnnotationOptions`, ...) n'a pas pu être compilée dans cet
@@ -60,6 +91,12 @@ class _MapWidgetState extends State<MapWidget> {
   mapbox.PointAnnotationManager? _pointAnnotationManager;
   mapbox.PolylineAnnotationManager? _polylineAnnotationManager;
 
+  /// Suivi des annotations Mapbox déjà créées, par id de marqueur — permet
+  /// de les mettre à jour en place au lieu de tout recréer.
+  final Map<String, mapbox.PointAnnotation> _markerAnnotations =
+      <String, mapbox.PointAnnotation>{};
+  final Map<String, LatLng> _lastMarkerPositions = <String, LatLng>{};
+
   @override
   Widget build(BuildContext context) {
     return mapbox.MapWidget(
@@ -75,12 +112,23 @@ class _MapWidgetState extends State<MapWidget> {
   @override
   void didUpdateWidget(covariant MapWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.markers != widget.markers) {
-      unawaited(_syncMarkers());
-    }
-    if (oldWidget.routePoints != widget.routePoints) {
+    // `_syncMarkers` compare position par position et ignore les marqueurs
+    // inchangés : appel systématique sans coût significatif, plutôt que de
+    // comparer des `List` par référence (toujours différentes, une nouvelle
+    // liste étant créée à chaque build par les appelants).
+    unawaited(_syncMarkers());
+    if (!_routePointsEqual(oldWidget.routePoints, widget.routePoints)) {
       unawaited(_syncRoute());
     }
+  }
+
+  bool _routePointsEqual(List<LatLng>? a, List<LatLng>? b) {
+    if (a == null || b == null) return a == b;
+    if (a.length != b.length) return false;
+    for (int i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
   }
 
   void _handleTap(mapbox.MapContentGestureContext context) {
@@ -102,11 +150,31 @@ class _MapWidgetState extends State<MapWidget> {
   Future<void> _syncMarkers() async {
     final mapbox.PointAnnotationManager? manager = _pointAnnotationManager;
     if (manager == null) return;
-    await manager.deleteAll();
+
+    final Set<String> currentIds = widget.markers
+        .map((MapMarkerData marker) => marker.id)
+        .toSet();
+
+    for (final String staleId in _markerAnnotations.keys
+        .where((String id) => !currentIds.contains(id))
+        .toList()) {
+      await manager.delete(_markerAnnotations.remove(staleId)!);
+      _lastMarkerPositions.remove(staleId);
+    }
+
     for (final MapMarkerData marker in widget.markers) {
-      await manager.create(
-        mapbox.PointAnnotationOptions(geometry: _toPoint(marker.position)),
-      );
+      if (_lastMarkerPositions[marker.id] == marker.position) continue;
+      _lastMarkerPositions[marker.id] = marker.position;
+
+      final mapbox.PointAnnotation? existing = _markerAnnotations[marker.id];
+      if (existing == null) {
+        _markerAnnotations[marker.id] = await manager.create(
+          mapbox.PointAnnotationOptions(geometry: _toPoint(marker.position)),
+        );
+      } else {
+        existing.geometry = _toPoint(marker.position);
+        await manager.update(existing);
+      }
     }
   }
 

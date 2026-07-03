@@ -83,7 +83,8 @@ Implémentation : `LocationRepositoryImpl`, qui délègue à `LocationRemoteData
 |---|---|---|
 | `createDelivery` | `Future<Result<DeliveryEntity>> createDelivery(DeliveryEntity delivery)` | Persiste la livraison dans `deliveries/{id}` (voir `FIRESTORE_SCHEMA.md`) et renvoie l'entité avec son `id`. |
 | `watchUserDeliveries` | `Stream<List<DeliveryEntity>> watchUserDeliveries(String senderId)` | Historique en flux, les plus récentes en premier — voir `ARCHITECTURE.md` §9.1 (nécessite un index composite Firestore, §9.5). |
-| `watchDeliveryById` | `Stream<DeliveryEntity?> watchDeliveryById(String id)` | Détail en flux (`null` si absent), prêt pour les mises à jour de statut de `tracking` (planifié). |
+| `watchDeliveryById` | `Stream<DeliveryEntity?> watchDeliveryById(String id)` | Détail en flux (`null` si absent), reflète les mises à jour de statut/position de `tracking`. |
+| `updateTrackingState` | `Future<Result<void>> updateTrackingState({required String id, required DeliveryStatus status, CoordinatesEntity? courierPosition})` | Contrat public consommé par `tracking` (`SimulateDeliveryTrackingUseCase`) — voir `ARCHITECTURE.md` §11.2. |
 
 ### Usecases
 
@@ -110,7 +111,7 @@ Implémentation : `LocationRepositoryImpl`, qui délègue à `LocationRemoteData
 
 `DeliveryRoutePage` (`/delivery/route`) → `PackageInfoPage` (`/delivery/package`) → `RecipientInfoPage` (`/delivery/recipient`) → `DeliverySummaryPage` (`/delivery/summary`). `LocationPickerPage` (feature `map`) est poussée via `Navigator` standard (pas une route GoRouter dédiée) depuis `DeliveryRoutePage`, deux fois (départ, destination).
 
-`DeliveryHistoryPage` (`/delivery/history`, recherche client + filtre par type) → `DeliveryDetailPage` (`/delivery/history/:id`, timeline/statut/carte/colis/destinataire).
+`DeliveryHistoryPage` (`/delivery/history`, recherche client + filtre par type) → `DeliveryDetailPage` (`/delivery/history/:id`, statut/carte/colis/destinataire) → `TrackingPage` (`/delivery/history/:id/tracking`, feature `tracking`, voir ci-dessous).
 
 ### Widgets partagés ajoutés
 
@@ -168,6 +169,33 @@ Déclenché depuis `PocUberApp` (`main.dart`), pas depuis `auth` — voir `ARCHI
 
 ---
 
+## Feature `tracking`
+
+Pas de `domain/repositories`/`data/` propres : orchestration pure au-dessus du contrat public de `delivery` (voir `ARCHITECTURE.md` §11.2).
+
+### Usecase (`lib/features/tracking/domain/usecases/simulate_delivery_tracking_usecase.dart`)
+
+| Usecase | Params | Retour | Description |
+|---|---|---|---|
+| `SimulateDeliveryTrackingUseCase` | `SimulateDeliveryTrackingParams({deliveryId, pickup, destination})` | `Result<void>` | Simule un trajet en 12 étapes (2s d'intervalle par défaut, injectable via `stepInterval` pour les tests), écrit position + statut via `DeliveryRepository.updateTrackingState` à chaque étape. Pilotage **côté client** — voir §11.1. |
+
+### Providers Riverpod (`lib/features/tracking/presentation/providers/tracking_providers.dart`)
+
+| Provider | Type | Rôle |
+|---|---|---|
+| `simulateDeliveryTrackingUseCaseProvider` | `Provider<SimulateDeliveryTrackingUseCase>` | Construit à partir de `deliveryRepositoryProvider` (feature `delivery`). |
+| `trackDeliveryControllerProvider` | `AsyncNotifierProvider<TrackDeliveryController, void>` | État de la simulation en cours (loading/erreur), consommé par `TrackingPage`. |
+
+### Page
+
+`TrackingPage` (`/delivery/history/:id/tracking`) — carte avec marqueur du livreur animé (`AnimationController` + `LatLng.lerp`, voir §11.3), bouton "Démarrer le suivi" tant que le statut est `pending`.
+
+### Widget partagé modifié
+
+`MapWidget` (`lib/shared/widgets/map_widget.dart`) : diffing des marqueurs revu pour une mise à jour en place — voir `ARCHITECTURE.md` §11.3. `LatLng`/`MapMarkerData` ont désormais une égalité de valeur (`==`/`hashCode`) et `LatLng` expose `LatLng.lerp`.
+
+---
+
 ## Features suivantes
 
-Non implémentées — voir `TASKS.md` : `tracking`, `settings`, `profile`, `notifications`. Chaque feature ajoutera sa section ici au moment de son implémentation.
+Non implémentées — voir `TASKS.md` : `settings`, `profile`, `notifications`. Chaque feature ajoutera sa section ici au moment de son implémentation.

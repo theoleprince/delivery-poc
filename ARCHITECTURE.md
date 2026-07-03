@@ -235,3 +235,23 @@ Décision produit assumée (documentée ici plutôt que validée séparément, p
 ### 10.4 Widgets partagés `WalletCard`/`TransactionCard`
 
 Même règle que `DeliveryCard`/`MapWidget` (§3, §8.1, §9.3) : paramètres déjà formatés (`balanceLabel`, `amountLabel`, ...), pas d'entité `wallet` passée directement à `shared/`.
+
+---
+
+## 11. Sprint 5 — Feature `tracking`
+
+### 11.1 Simulation pilotée côté client, pas par un vrai livreur
+
+Il n'existe aucune app livreur ni service serveur dans ce POC. `SimulateDeliveryTrackingUseCase` (feature `tracking`) fait donc avancer la simulation **depuis l'app de l'expéditeur** : quand celui-ci ouvre `TrackingPage` et démarre le suivi, l'app calcule elle-même une trajectoire en ligne droite (12 points intermédiaires, un toutes les 2 secondes) entre départ et destination, et écrit position + statut dans Firestore à chaque étape. Limitation assumée et documentée : si l'app est fermée pendant la simulation, elle s'arrête — une vraie plateforme utiliserait la position GPS réelle du livreur (émise depuis son propre appareil) ou une Cloud Function planifiée. `stepInterval` est injectable dans le constructeur du usecase pour permettre aux tests de tourner sans attendre 24 secondes (voir `simulate_delivery_tracking_usecase_test.dart`).
+
+### 11.2 `tracking` dépend du contrat public de `delivery`, jamais l'inverse
+
+`DeliveryStatus` gagne 3 valeurs (`pickedUp`, `inTransit`, `delivered`) et `DeliveryEntity` un champ `courierPosition` — ajoutés directement dans `features/delivery/domain` plutôt que dans une entité `tracking` séparée, parce que le statut et la position appartiennent conceptuellement au document `deliveries` (une seule source de vérité, cohérent avec `FIRESTORE_SCHEMA.md`). `DeliveryRepository` gagne `updateTrackingState({id, status, courierPosition})` : c'est ce contrat que `SimulateDeliveryTrackingUseCase` appelle (`tracking` → `delivery`, même sens de dépendance que `delivery` → `map` ou `wallet` → `auth`). `tracking` n'a donc pas de `data/`/`domain/repositories` propres : son seul rôle est d'orchestrer des appels au contrat public de `delivery`.
+
+### 11.3 `MapWidget` : mise à jour de marqueurs en place, pas de recreate
+
+L'exigence "animation fluide du marqueur" (`CLAUDE.md`) a révélé une limite de `MapWidget` (§8.1) : son diffing comparait des `List<MapMarkerData>` par référence, or une nouvelle liste est construite à chaque `build()` par les appelants — `_syncMarkers` supprimait donc et recréait tous les marqueurs à *chaque* frame dès qu'un widget parent se reconstruisait, y compris pendant l'animation à 60 img/s de `TrackingPage`. Corrigé en suivant les annotations Mapbox créées dans un `Map<String, PointAnnotation>` indexé par `MapMarkerData.id`, comparées par position (`LatLng`/`MapMarkerData` ont maintenant une égalité de valeur) : un marqueur inchangé ne déclenche plus aucun appel SDK, un marqueur déplacé est mis à jour en place (`manager.update`), seuls les marqueurs ajoutés/retirés sont créés/supprimés. `TrackingPage` anime le marqueur du livreur avec un `AnimationController` + `LatLng.lerp` entre la dernière position connue et la nouvelle reçue de Firestore, pour un mouvement continu entre deux mises à jour réseau plutôt qu'un "saut".
+
+### 11.4 Timeline et statut : `TrackingPage` complète `DeliveryDetailPage`
+
+`DeliveryDetailPage` (§9.6) affiche désormais le statut réel (plus de valeur figée) et un bouton "Suivre en temps réel" tant que la livraison n'est pas `delivered`. La timeline détaillée (horodatage de chaque changement de statut) resterait à faire — ce sprint stocke uniquement le statut courant, pas un historique d'événements, jugé suffisant pour la démo (voir `TASKS.md`).

@@ -7,18 +7,12 @@ import 'package:poc_uber/core/constants/app_routes.dart';
 import 'package:poc_uber/features/auth/presentation/providers/auth_providers.dart';
 import 'package:poc_uber/features/delivery/domain/entities/delivery_entity.dart';
 import 'package:poc_uber/features/delivery/presentation/providers/delivery_providers.dart';
+import 'package:poc_uber/features/delivery/presentation/utils/delivery_status_label.dart';
 import 'package:poc_uber/shared/widgets/app_error_widget.dart';
 import 'package:poc_uber/shared/widgets/delivery_card.dart';
 import 'package:poc_uber/shared/widgets/empty_state.dart';
 import 'package:poc_uber/shared/widgets/loading_widget.dart';
 import 'package:poc_uber/shared/widgets/search_field.dart';
-
-String _statusLabel(DeliveryStatus status) {
-  switch (status) {
-    case DeliveryStatus.pending:
-      return 'En attente';
-  }
-}
 
 String _typeLabel(DeliveryType type) {
   switch (type) {
@@ -127,7 +121,7 @@ class DeliveryHistoryPage extends HookConsumerWidget {
                       destination: delivery.destination.formattedAddress,
                       recipientName: delivery.recipient.name,
                       statusLabel:
-                          '${_statusLabel(delivery.status)} · ${_typeLabel(delivery.deliveryType)}',
+                          '${deliveryStatusLabel(delivery.status)} · ${_typeLabel(delivery.deliveryType)}',
                       priceLabel:
                           '${delivery.estimatedPrice.toStringAsFixed(2)} €',
                       onTap: () => context.push(

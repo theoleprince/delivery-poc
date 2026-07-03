@@ -65,12 +65,24 @@ Légende : `[x]` fait · `[ ]` à faire · `[~]` partiellement fait (voir note)
 
 ---
 
-## Backlog — Features non démarrées
+## Sprint 5 — Feature `tracking`
 
-### `tracking` (Suivi temps réel)
-- [ ] Analyse + Architecture (réutilisera `MapWidget`/`LocationRepository` de la feature `map`)
-- [ ] Simulation du déplacement livreur, mise à jour Firestore, animation fluide du marqueur (StreamBuilder/Riverpod)
-- [ ] Cycle de vie complet de `DeliveryStatus` (actuellement figé à `pending`)
+- [x] Domain `delivery` étendu : `DeliveryStatus` (`pending`/`pickedUp`/`inTransit`/`delivered`), `DeliveryEntity.courierPosition`, `DeliveryRepository.updateTrackingState`
+- [x] Data `delivery` étendue : `DeliveryModel.courierLatitude`/`courierLongitude`, `DeliveryRemoteDataSource.updateTrackingState`, `DeliveryRepositoryImpl.updateTrackingState`
+- [x] Feature **`tracking`** : `SimulateDeliveryTrackingUseCase` (simulation client, 12 étapes), `TrackDeliveryController`, `TrackingPage` (marqueur animé)
+- [x] **Correctif `MapWidget`** : diffing des marqueurs en place (id-based), `LatLng`/`MapMarkerData` avec égalité de valeur, `LatLng.lerp` — nécessaire pour l'animation fluide (voir `ARCHITECTURE.md` §11.3)
+- [x] `DeliveryDetailPage` : statut réel affiché, bouton "Suivre en temps réel", marqueur livreur sur la carte si suivi démarré
+- [x] `deliveryStatusLabel` extrait en helper partagé (`delivery`/`tracking`) pour éviter la triplication
+- [x] Routing : `/delivery/history/:id/tracking`
+- [x] Tests unitaires (`SimulateDeliveryTrackingUseCase` avec `stepInterval` injectable, `DeliveryRepositoryImpl.updateTrackingState`)
+- [x] Docs mises à jour : `ARCHITECTURE.md` §11, `FIRESTORE_SCHEMA.md` (`deliveries` : nouveaux statuts + champs courier), `API_DOCUMENTATION.md`
+- [ ] Exécution réelle (côté utilisateur) : `flutter analyze`, `flutter test` — `map_widget.dart` en particulier (API Mapbox non compilée ici)
+
+**Toutes les fonctionnalités listées dans `CLAUDE.md` sont maintenant couvertes sauf `settings`, `profile` et `notifications`.**
+
+---
+
+## Backlog — Features non démarrées
 
 ### `settings` (Paramètres)
 - [ ] Analyse + Architecture
@@ -92,6 +104,8 @@ Légende : `[x]` fait · `[ ]` à faire · `[~]` partiellement fait (voir note)
 - [ ] `GetRouteUseCase` (feature `map`) : remplacer la polyline en ligne droite par un vrai calcul d'itinéraire (Directions API) — voir `ARCHITECTURE.md` §8.3
 - [ ] `DeliveryPricing` : remplacer le calcul simplifié par un vrai moteur de tarification (zones, surcharge horaire) — voir `ARCHITECTURE.md` §8.8
 - [ ] Débit wallet après création de livraison : pas de saga/transaction distribuée entre `deliveries` et `wallets`/`transactions` (nécessiterait une Cloud Function) — voir `ARCHITECTURE.md` §10.3
+- [ ] `SimulateDeliveryTrackingUseCase` : simulation pilotée par l'app expéditeur, pas par un vrai livreur/service serveur — s'arrête si l'app est fermée. Une vraie plateforme utiliserait la position GPS du livreur ou une Cloud Function — voir `ARCHITECTURE.md` §11.1
+- [ ] Timeline détaillée des changements de statut (horodatage de chaque étape) : seul le statut courant est stocké, pas un historique d'événements — voir `ARCHITECTURE.md` §11.4
 
 ---
 

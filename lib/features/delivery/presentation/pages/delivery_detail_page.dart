@@ -1,24 +1,22 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:poc_uber/config/theme/spacing.dart';
+import 'package:poc_uber/core/constants/app_routes.dart';
 import 'package:poc_uber/features/delivery/domain/entities/delivery_entity.dart';
 import 'package:poc_uber/features/delivery/presentation/providers/delivery_providers.dart';
+import 'package:poc_uber/features/delivery/presentation/utils/delivery_status_label.dart';
 import 'package:poc_uber/shared/widgets/app_error_widget.dart';
 import 'package:poc_uber/shared/widgets/card_widget.dart';
 import 'package:poc_uber/shared/widgets/loading_widget.dart';
 import 'package:poc_uber/shared/widgets/map_widget.dart' as widgets;
+import 'package:poc_uber/shared/widgets/primary_button.dart';
 
-String _statusLabel(DeliveryStatus status) {
-  switch (status) {
-    case DeliveryStatus.pending:
-      return 'En attente de prise en charge';
-  }
-}
-
-/// Détail complet d'une livraison : timeline, statut, carte, destinataire,
-/// colis. La timeline n'a qu'un seul événement ce sprint ("Créée le ...") —
-/// le cycle de vie complet des statuts appartient à `tracking` (planifié).
+/// Détail complet d'une livraison : statut, carte (avec position du
+/// livreur si le suivi a démarré), destinataire, colis. Timeline limitée à
+/// "Créée le ..." — le cycle de vie complet des statuts est piloté par
+/// `tracking` (voir `TrackingPage`).
 class DeliveryDetailPage extends ConsumerWidget {
   const DeliveryDetailPage({required this.deliveryId, super.key});
 
@@ -78,6 +76,14 @@ class _DeliveryDetailBody extends StatelessWidget {
                   id: 'destination',
                   position: destinationPoint,
                 ),
+                if (delivery.courierPosition != null)
+                  widgets.MapMarkerData(
+                    id: 'courier',
+                    position: widgets.LatLng(
+                      latitude: delivery.courierPosition!.latitude,
+                      longitude: delivery.courierPosition!.longitude,
+                    ),
+                  ),
               ],
               routePoints: <widgets.LatLng>[pickupPoint, destinationPoint],
             ),
@@ -89,7 +95,7 @@ class _DeliveryDetailBody extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              Text(_statusLabel(delivery.status)),
+              Text(deliveryStatusLabel(delivery.status)),
               if (delivery.createdAt != null) ...<Widget>[
                 const SizedBox(height: Spacing.xs),
                 Text(
@@ -98,6 +104,17 @@ class _DeliveryDetailBody extends StatelessWidget {
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
               ],
+              const SizedBox(height: Spacing.sm),
+              PrimaryButton(
+                label: delivery.status == DeliveryStatus.delivered
+                    ? 'Livraison terminée'
+                    : 'Suivre en temps réel',
+                onPressed: delivery.status == DeliveryStatus.delivered
+                    ? null
+                    : () => context.push(
+                        AppRoutes.deliveryTracking(delivery.id!),
+                      ),
+              ),
             ],
           ),
         ),

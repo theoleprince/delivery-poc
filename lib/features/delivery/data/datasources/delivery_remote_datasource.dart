@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:poc_uber/core/constants/firestore_collections.dart';
 import 'package:poc_uber/core/firestore/firestore_write_helpers.dart';
 import 'package:poc_uber/features/delivery/data/models/delivery_model.dart';
+import 'package:poc_uber/features/delivery/domain/entities/delivery_entity.dart';
 
 /// Encapsule l'écriture Firestore de la collection `deliveries` (voir
 /// ARCHITECTURE.md §8 : 2e feature à utiliser `attachTimestamps`).
@@ -14,6 +15,13 @@ abstract interface class DeliveryRemoteDataSource {
   Stream<List<DeliveryModel>> watchUserDeliveries(String senderId);
 
   Stream<DeliveryModel?> watchDeliveryById(String id);
+
+  Future<void> updateTrackingState({
+    required String id,
+    required DeliveryStatus status,
+    double? courierLatitude,
+    double? courierLongitude,
+  });
 }
 
 class DeliveryRemoteDataSourceImpl implements DeliveryRemoteDataSource {
@@ -64,6 +72,26 @@ class DeliveryRemoteDataSourceImpl implements DeliveryRemoteDataSource {
           (DocumentSnapshot<Map<String, dynamic>> doc) => doc.exists
               ? DeliveryModel.fromJson(doc.data()!).copyWith(id: doc.id)
               : null,
+        );
+  }
+
+  @override
+  Future<void> updateTrackingState({
+    required String id,
+    required DeliveryStatus status,
+    double? courierLatitude,
+    double? courierLongitude,
+  }) {
+    return _firestore
+        .collection(FirestoreCollections.deliveries)
+        .doc(id)
+        .update(
+          attachTimestamps(<String, Object?>{
+            'status': status.name,
+            if (courierLatitude != null) 'courierLatitude': courierLatitude,
+            if (courierLongitude != null)
+              'courierLongitude': courierLongitude,
+          }, isCreate: false),
         );
   }
 }

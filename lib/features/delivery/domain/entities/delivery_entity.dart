@@ -2,6 +2,7 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:poc_uber/features/delivery/domain/entities/package_entity.dart';
 import 'package:poc_uber/features/delivery/domain/entities/recipient_entity.dart';
 import 'package:poc_uber/features/map/domain/entities/address_entity.dart';
+import 'package:poc_uber/features/map/domain/entities/coordinates_entity.dart';
 
 part 'delivery_entity.freezed.dart';
 
@@ -12,10 +13,9 @@ enum DeliveryType { standard, express }
 
 enum PaymentMethod { beforeDelivery, onDelivery }
 
-/// Statut figé à `pending` pour ce sprint (flux de création uniquement) —
-/// le cycle de vie complet (`pickedUp`, `inTransit`, `delivered`, ...)
-/// appartient à la feature `tracking`, pas encore implémentée.
-enum DeliveryStatus { pending }
+/// Cycle de vie piloté par la feature `tracking` (simulation) via
+/// `DeliveryRepository.updateTrackingState` — voir ARCHITECTURE.md §11.
+enum DeliveryStatus { pending, pickedUp, inTransit, delivered }
 
 @freezed
 class DeliveryEntity with _$DeliveryEntity {
@@ -33,5 +33,9 @@ class DeliveryEntity with _$DeliveryEntity {
     required PaymentMethod paymentMethod,
     @Default(DeliveryStatus.pending) DeliveryStatus status,
     DateTime? createdAt,
+
+    /// Position simulée du livreur, mise à jour par `tracking`. `null`
+    /// tant que le suivi n'a pas été démarré.
+    CoordinatesEntity? courierPosition,
   }) = _DeliveryEntity;
 }

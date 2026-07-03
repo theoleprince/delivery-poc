@@ -22,6 +22,10 @@ abstract final class AppRoutes {
 
   static String deliveryDetail(String id) => '/delivery/history/$id';
 
+  static const String deliveryTrackingPattern = '/delivery/history/:id/tracking';
+
+  static String deliveryTracking(String id) => '/delivery/history/$id/tracking';
+
   static const String wallet = '/wallet';
   static const String transactionDetailPattern = '/wallet/transactions/:id';
 

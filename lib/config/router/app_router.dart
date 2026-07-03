@@ -19,6 +19,7 @@ import 'package:poc_uber/features/delivery/presentation/pages/delivery_route_pag
 import 'package:poc_uber/features/delivery/presentation/pages/delivery_summary_page.dart';
 import 'package:poc_uber/features/delivery/presentation/pages/package_info_page.dart';
 import 'package:poc_uber/features/delivery/presentation/pages/recipient_info_page.dart';
+import 'package:poc_uber/features/tracking/presentation/pages/tracking_page.dart';
 import 'package:poc_uber/features/wallet/presentation/pages/transaction_detail_page.dart';
 import 'package:poc_uber/features/wallet/presentation/pages/wallet_page.dart';
 import 'package:poc_uber/shared/widgets/primary_button.dart';
@@ -116,6 +117,11 @@ GoRouter appRouter(Ref ref) {
         path: AppRoutes.deliveryDetailPattern,
         builder: (BuildContext context, GoRouterState state) =>
             DeliveryDetailPage(deliveryId: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: AppRoutes.deliveryTrackingPattern,
+        builder: (BuildContext context, GoRouterState state) =>
+            TrackingPage(deliveryId: state.pathParameters['id']!),
       ),
       GoRoute(
         path: AppRoutes.wallet,

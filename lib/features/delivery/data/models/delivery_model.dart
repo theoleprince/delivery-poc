@@ -4,6 +4,7 @@ import 'package:poc_uber/features/delivery/data/models/address_model.dart';
 import 'package:poc_uber/features/delivery/data/models/package_model.dart';
 import 'package:poc_uber/features/delivery/data/models/recipient_model.dart';
 import 'package:poc_uber/features/delivery/domain/entities/delivery_entity.dart';
+import 'package:poc_uber/features/map/domain/entities/coordinates_entity.dart';
 
 part 'delivery_model.freezed.dart';
 part 'delivery_model.g.dart';
@@ -28,6 +29,12 @@ class DeliveryModel with _$DeliveryModel {
     required DeliveryStatus status,
     @ServerTimestampConverter() DateTime? createdAt,
     @ServerTimestampConverter() DateTime? updatedAt,
+
+    /// Coordonnées séparées plutôt qu'un objet imbriqué : ces deux champs
+    /// sont réécrits isolément et très fréquemment par `tracking`
+    /// (`updateTrackingState`) — pas besoin d'un modèle dédié pour 2 doubles.
+    double? courierLatitude,
+    double? courierLongitude,
   }) = _DeliveryModel;
 
   const DeliveryModel._();
@@ -48,6 +55,8 @@ class DeliveryModel with _$DeliveryModel {
     deliveryType: entity.deliveryType,
     paymentMethod: entity.paymentMethod,
     status: entity.status,
+    courierLatitude: entity.courierPosition?.latitude,
+    courierLongitude: entity.courierPosition?.longitude,
   );
 
   DeliveryEntity toEntity() => DeliveryEntity(
@@ -64,5 +73,11 @@ class DeliveryModel with _$DeliveryModel {
     paymentMethod: paymentMethod,
     status: status,
     createdAt: createdAt,
+    courierPosition: courierLatitude == null || courierLongitude == null
+        ? null
+        : CoordinatesEntity(
+            latitude: courierLatitude!,
+            longitude: courierLongitude!,
+          ),
   );
 }

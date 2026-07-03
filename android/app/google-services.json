@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "879502954334",
+    "project_id": "delivery-poc-a633f",
+    "storage_bucket": "delivery-poc-a633f.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:879502954334:android:3476291f0f7d58dce549cf",
+        "android_client_info": {
+          "package_name": "com.example.poc_uber"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAXgTIc74uvIYg0SNHc5JV9DQsY3hsmCVE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

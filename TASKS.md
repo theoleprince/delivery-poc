@@ -1,0 +1,89 @@
+# TASKS.md
+
+Backlog du projet, organisé par feature, suivant la méthode imposée par `CLAUDE.md` (une feature à la fois : Analyse → Architecture → Plan → Implémentation → Tests → Optimisation → Documentation).
+
+Légende : `[x]` fait · `[ ]` à faire · `[~]` partiellement fait (voir note)
+
+---
+
+## Sprint courant — Fondations + Authentification
+
+- [x] `ARCHITECTURE.md`, `PROJECT_STRUCTURE.md`, `FIRESTORE_SCHEMA.md`, `README.md`, `CHANGELOG.md`, `TASKS.md`, `API_DOCUMENTATION.md`
+- [x] Scaffold technique : `pubspec.yaml`, `analysis_options.yaml`, `lib/core`, `lib/config` (theme/router/firebase placeholder), `lib/main.dart`
+- [x] Design System (tokens statiques) : `AppColors`, `AppTypography`, `Spacing`, `Radius`, `Elevation`, `AppTheme` (light/dark)
+- [x] Widgets partagés (sous-ensemble consommé par Auth) : `PrimaryButton`, `SecondaryButton`, `InputField`, `LoadingWidget`, `AppErrorWidget`
+- [x] Feature **Authentification** complète (domain/data/presentation) : connexion, inscription, déconnexion, reset password, session persistante
+- [x] Tests unitaires (usecases, repository) + test widget (SignInPage) pour Auth
+- [ ] Exécution réelle (côté utilisateur, SDK Flutter requis) : `flutter create .`, `pub get`, `build_runner`, `flutter analyze`, `flutter test`
+- [ ] Connexion à un vrai projet Firebase (`flutterfire configure`) — hors scope tant qu'aucun projet n'est fourni
+
+---
+
+## Sprint 2 — Feature `map` + Feature `delivery` (flux de création)
+
+- [x] Décision + amendement `CLAUDE.md` : Mapbox plutôt que Google Maps Flutter (facturation Google Cloud évitée pour ce POC)
+- [x] Feature **`map`** complète : position actuelle, recherche/reverse geocoding d'adresse, calcul de trajet (distance réelle, polyline simulée en ligne droite), `LocationPickerPage`
+- [x] Feature **`delivery`** — flux de création complet : trajet (via `map`), colis, destinataire, récapitulatif (type de livraison, mode de paiement, estimation prix/durée), sauvegarde Firestore (`deliveries/{id}`)
+- [x] Widgets partagés : `MapWidget` (Mapbox), `SearchField`, `CardWidget`
+- [x] `core/providers/firebase_providers.dart` (Firebase partagé), `core/firestore/firestore_write_helpers.dart` (`attachTimestamps`), `core/firestore/server_timestamp_converter.dart` — introduits à la 2e feature Firestore, `auth` refactorée pour les réutiliser
+- [x] Tests unitaires (usecases `map`/`delivery`, repositories, `DeliveryPricing`) + test widget (`PackageInfoPage`)
+- [x] Docs mises à jour : `ARCHITECTURE.md` §8, `FIRESTORE_SCHEMA.md` (`deliveries`), `API_DOCUMENTATION.md`, `README.md` (setup Mapbox/geocoding)
+- [ ] Exécution réelle (côté utilisateur) : `flutter pub get` (récupère `mapbox_maps_flutter`/`geocoding`), `build_runner`, `flutter analyze`, `flutter test`
+- [ ] Configuration native de la clé Mapbox (voir `README.md`) — bloquant pour tester la carte réellement
+
+---
+
+## Sprint 3 — Feature `delivery` : Historique + Détail
+
+- [x] Domain : `DeliveryRepository.watchUserDeliveries`/`watchDeliveryById` (flux), `WatchUserDeliveriesUseCase`, `WatchDeliveryByIdUseCase`
+- [x] Data : `DeliveryRemoteDataSource`/`DeliveryRepositoryImpl` — requêtes Firestore `.snapshots()` (liste filtrée + document unique)
+- [x] Presentation : `DeliveryHistoryPage` (liste temps réel, recherche client, filtre par type), `DeliveryDetailPage` (timeline minimale, statut, carte, colis, destinataire)
+- [x] Widgets partagés : `DeliveryCard`, `EmptyState` ; `CardWidget` étendu avec `onTap`
+- [x] Routing : `/delivery/history`, `/delivery/history/:id`, lien "Historique" depuis la home
+- [x] Tests unitaires (usecase, repository — mapping de flux) + test widget (`DeliveryCard`)
+- [x] Docs mises à jour : `ARCHITECTURE.md` §9, `FIRESTORE_SCHEMA.md` (index composite requis), `API_DOCUMENTATION.md`
+- [ ] Exécution réelle (côté utilisateur) : `flutter analyze`, `flutter test`
+- [ ] Créer l'index composite Firestore (`senderId` + `createdAt`) une fois un vrai projet connecté — voir `FIRESTORE_SCHEMA.md`
+
+**Feature `delivery` considérée complète** (création + historique + détail). Le cycle de vie du statut (`DeliveryStatus`) reste à faire avec `tracking`.
+
+---
+
+## Backlog — Features non démarrées
+
+### `wallet` (Portefeuille)
+- [ ] Analyse + Architecture
+- [ ] Création automatique du wallet utilisateur (déclenchée à l'inscription — à coordonner avec `auth`)
+- [ ] Solde, liste transactions, détail transaction (simulation via Firestore)
+- [ ] Widgets : `WalletCard`, `TransactionCard`
+
+### `tracking` (Suivi temps réel)
+- [ ] Analyse + Architecture (réutilisera `MapWidget`/`LocationRepository` de la feature `map`)
+- [ ] Simulation du déplacement livreur, mise à jour Firestore, animation fluide du marqueur (StreamBuilder/Riverpod)
+- [ ] Cycle de vie complet de `DeliveryStatus` (actuellement figé à `pending`)
+
+### `settings` (Paramètres)
+- [ ] Analyse + Architecture
+- [ ] Moteur de configuration dynamique lu depuis Firestore (nom app, logo, couleur principale, dark mode, position menu, icônes, police, devise, activation wallet/tracking/notifications/paiement)
+- [ ] Mise à jour automatique de l'app à la modification des paramètres
+
+### `profile` (Profil)
+- [ ] Analyse + Architecture
+- [ ] Extension du document `users/{uid}` créé par `auth` (photo, préférences, adresses)
+
+### `notifications`
+- [ ] Analyse + Architecture
+- [ ] Intégration Firebase Cloud Messaging, collection `notifications`
+
+### Widgets partagés restants (à construire avec leur feature consommatrice)
+- [ ] `WalletCard`, `TransactionCard`, `BottomNavigation`, `Toolbar`
+
+### Limitations connues à lever plus tard
+- [ ] `GetRouteUseCase` (feature `map`) : remplacer la polyline en ligne droite par un vrai calcul d'itinéraire (Directions API) — voir `ARCHITECTURE.md` §8.3
+- [ ] `DeliveryPricing` : remplacer le calcul simplifié par un vrai moteur de tarification (zones, surcharge horaire) — voir `ARCHITECTURE.md` §8.8
+
+---
+
+## Règle de mise à jour
+
+Chaque nouvelle feature démarrée doit d'abord mettre à jour ce fichier (cases cochées au fil de l'avancement) et `CHANGELOG.md`, conformément à `# METHODE DE TRAVAIL` dans `CLAUDE.md`.

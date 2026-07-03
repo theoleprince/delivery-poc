@@ -1,0 +1,32 @@
+import 'package:flutter/material.dart';
+
+/// Champ de recherche générique du Design System (ex. recherche d'adresse
+/// dans `LocationPickerPage`).
+class SearchField extends StatelessWidget {
+  const SearchField({
+    required this.hintText,
+    this.controller,
+    this.onChanged,
+    this.onSubmitted,
+    super.key,
+  });
+
+  final String hintText;
+  final TextEditingController? controller;
+  final ValueChanged<String>? onChanged;
+  final ValueChanged<String>? onSubmitted;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: controller,
+      onChanged: onChanged,
+      onSubmitted: onSubmitted,
+      textInputAction: TextInputAction.search,
+      decoration: InputDecoration(
+        hintText: hintText,
+        prefixIcon: const Icon(Icons.search),
+      ),
+    );
+  }
+}
